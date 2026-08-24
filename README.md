@@ -1,124 +1,95 @@
-# Chrome Autofill Extension (Aislada)
+# Chrome Autofill Extension
 
-Esta carpeta contiene una extension de Chrome independiente para:
+Extension de Chrome (Manifest V3) para autocompletar formularios y recuperar OTP desde Mailinator.
 
-- Inyectar un boton fijo en la esquina inferior derecha.
-- Autocompletar nombre, apellido, email y telefono con FakerJS.
-- Leer el OTP mas reciente (6 digitos) desde un inbox publico de Mailinator.
+## Funcionalidades
 
-## Estructura
+- Boton flotante ("Auto + OTP") para ejecutar autofill.
+- Generacion de datos de prueba con FakerJS.
+- Recuperacion de OTP (6 digitos) desde inbox publico de Mailinator.
+- Preferencias por host guardadas en `chrome.storage.local`:
+  - Posicion del boton.
+  - Last name fijo opcional.
+  - Estado de sugerencias ZIP.
+- Aviso de nueva version disponible comparando la version instalada con la latest release.
 
-- `manifest.json`: permisos y registro del content script.
-- `src/content.ts`: logica principal.
-- `dist/content.js`: archivo generado para Chrome.
+## Requisitos
 
-## Instalacion
+- Node.js 20+
+- npm
+- Google Chrome
 
-1. En esta carpeta, instala dependencias:
+## Instalacion y desarrollo local
+
+1. Instala dependencias:
 
 ```bash
 npm install
 ```
 
-2. Compila el content script:
+2. Compila la extension:
 
 ```bash
 npm run build
 ```
 
-3. Abre `chrome://extensions/`.
-4. Activa **Developer mode**.
-5. Haz click en **Load unpacked** y selecciona esta carpeta `chrome-autofill-extension`.
+3. Carga en Chrome:
+- Abre `chrome://extensions/`
+- Activa **Developer mode**
+- Haz click en **Load unpacked**
+- Selecciona la carpeta del proyecto
 
-## Uso
+## Scripts disponibles
 
-1. Navega a una pagina con formulario.
-2. Presiona el boton **Autocompletar + OTP**.
-3. La extension llenara campos comunes y tratara de buscar OTP en Mailinator.
+- `npm run build`: compila `src/content.ts` y `src/background.ts` en `dist/`.
+- `npm run watch`: compila en modo watch.
+- `npm run typecheck`: validacion TypeScript sin emitir archivos.
+- `npm run package`: genera artefactos de distribucion en `artifacts/`.
+- `npm run release:patch|minor|major`: incrementa version, crea commit, crea tag y hace push con tags.
 
-## Nota sobre Mailinator
+## Empaquetado
 
-El script usa scraping directo sobre la web publica de Mailinator:
+`npm run package` genera:
 
-- `GET https://www.mailinator.com/v4/public/inboxes.jsp?to={inbox}`
-- `GET https://www.mailinator.com/v4/public/msg.jsp?...`
+- `artifacts/unpacked-v<version>/`: carpeta lista para `Load unpacked`.
+- `artifacts/chrome-autofill-extension-v<version>.zip`: ZIP versionado.
 
-Si una pagina requiere una direccion de correo especifica, puedes editar el inbox en `src/content.ts`.
+## Release y descarga
 
-## Icono de la extension
+El workflow de release publica assets en GitHub Releases.
 
-La extension ahora usa iconos en:
+Archivo recomendado para usuarios:
 
-- `icons/icon16.png`
-- `icons/icon32.png`
-- `icons/icon48.png`
-- `icons/icon128.png`
+- `autofill-otp-chrome-latest.zip` (asset estable para "ultima version").
 
-Estos archivos estan referenciados en `manifest.json` en `icons` y `action.default_icon`.
+URL estable:
 
-## Empaquetado y distribucion
+- `https://github.com/sroncall/chrome-autofill-extension/releases/latest/download/autofill-otp-chrome-latest.zip`
 
-No necesitas usar siempre **Developer mode**.
+## OTP con Mailinator
 
-- Para desarrollo local: si, se usa `Load unpacked` en `chrome://extensions`.
-- Para distribucion real a usuarios: lo formal es publicar en **Chrome Web Store**.
+La extension consulta el API publico v2 de Mailinator desde background script y busca el codigo OTP en los mensajes mas recientes del inbox.
 
-### Opcion recomendada (formal): Chrome Web Store
+## Hosts soportados
 
-1. Genera el paquete ZIP listo para subir:
+La extension se inyecta segun `content_scripts.matches` y validaciones runtime.
 
-```bash
-npm run package
-```
+Incluye, entre otros:
 
-Este comando:
+- `genmobile.com` y subdominios
+- `emerios.com` y subdominios
+- `localhost` y `127.0.0.1`
+- Hosts con prefijo `fluxor-public.` y `fluxor-fe.`
 
-- Compila la extension.
-- Crea carpeta minima para desarrollo local: `artifacts/unpacked-v<version>/`.
-- Crea un ZIP en `artifacts/` con la version actual de `package.json` (ej. `chrome-autofill-extension-v1.0.0.zip`).
-- Mantiene artefactos de empaquetado (`.crx`, `.pem`) dentro de `artifacts/` para no mezclar con el proyecto principal.
+## Estructura principal
 
-Para `Load unpacked`, usa la carpeta `artifacts/unpacked-v<version>/`.
+- `manifest.json`: configuracion Manifest V3.
+- `src/content.ts`: inicializacion del content script.
+- `src/background.ts`: logica de OTP y mensajeria.
+- `src/content/`: modulos de autofill, UI y storage.
+- `scripts/packageExtension.ps1`: empaquetado local.
 
-2. Si prefieres manual, ejecuta el build:
+## Notas
 
-```bash
-npm run build
-```
-
-3. Crea un ZIP del contenido de esta carpeta `chrome-autofill-extension` incluyendo al menos:
-
-- `manifest.json`
-- carpeta `dist/`
-- carpeta `icons/`
-
-4. Ve a Chrome Web Store Developer Dashboard y sube ese ZIP.
-5. Completa ficha, screenshots, privacidad y publica.
-6. Luego cualquier usuario instala desde la tienda sin Developer mode.
-
-### Opcion no recomendada para publico general
-
-Empaquetar como `.crx` fuera de la tienda puede funcionar en contextos controlados, pero Chrome suele restringir instalacion externa en usuarios finales. Para algo "formal y autentico", usa Web Store.
-
-## En que paginas aparece el boton
-
-Ya no aparece en todas las paginas. Se limita por `content_scripts.matches` en `manifest.json`.
-
-Para soportar hosts tipo `fluxor-public.*` y `fluxor-fe.*` (que no se pueden expresar directamente con match patterns de Chrome), tambien hay un filtro en runtime en `src/content.ts`.
-
-Actualmente esta habilitado para:
-
-- `https://genmobile.com/*`
-- `https://*.genmobile.com/*`
-- `https://fluxor-public.*` (via filtro runtime por prefijo de host)
-- `https://fluxor-fe.*` (via filtro runtime por prefijo de host)
-- Ejemplos validos:
-	- `https://fluxor-fe.master.stg.emerios.com/en/login?vertical=dish`
-	- `https://fluxor-fe.develop.stg.emerios.com/en/login`
-	- `https://fluxor-public.develop.stg.emerios.com/en/flow/dish/home`
-- `http://localhost/*`
-- `https://localhost/*`
-- `http://127.0.0.1/*`
-- `https://127.0.0.1/*`
-
-Si quieres agregar o quitar sitios, edita ese arreglo y vuelve a compilar.
+- Se recomienda publicar para usuarios finales mediante Chrome Web Store.
+- Mantener el formato de tags de release como `vX.Y.Z`.
