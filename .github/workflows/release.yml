@@ -8,15 +8,10 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build-and-publish:
     runs-on: windows-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -43,27 +38,14 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           "file=$file" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      - name: Prepare Pages content
+      - name: Prepare stable release asset
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path public -Force | Out-Null
-          Copy-Item "artifacts/${{ steps.meta.outputs.file }}" "public/autofill-otp-chrome-latest.zip" -Force
+          Copy-Item "artifacts/${{ steps.meta.outputs.file }}" "artifacts/autofill-otp-chrome-latest.zip" -Force
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/${{ steps.meta.outputs.file }}
-            public/autofill-otp-chrome-latest.zip
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
-
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+            artifacts/autofill-otp-chrome-latest.zip
