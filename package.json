@@ -1,7 +1,7 @@
 {
   "name": "chrome-autofill-extension",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Chrome extension para autocompletar formularios y OTP con Mailinator",
   "scripts": {
     "build": "esbuild src/content.ts src/background.ts --bundle --format=iife --platform=browser --target=chrome114 --outdir=dist",

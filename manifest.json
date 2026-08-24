@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Form Autofill + Mailinator OTP",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Autocompleta formularios usando FakerJS y recupera OTP desde Mailinator.",
   "icons": {
     "16": "icons/icon16.png",
