@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Smart Form Autofill + Mailinator OTP",
+  "version": "1.0.0",
+  "description": "Autocompleta formularios usando FakerJS y recupera OTP desde Mailinator.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Smart Form Autofill + Mailinator OTP",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.mailinator.com/*"
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://genmobile.com/*",
+        "https://*.genmobile.com/*",
+        "https://*.emerios.com/*",
+        "http://localhost/*",
+        "https://localhost/*",
+        "http://127.0.0.1/*",
+        "https://127.0.0.1/*"
+      ],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
