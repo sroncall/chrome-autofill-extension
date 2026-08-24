@@ -14,6 +14,76 @@ import {
 } from "./storage";
 import { normalizeHumanName } from "./utils";
 
+const LATEST_RELEASE_API_URL = "https://api.github.com/repos/sroncall/chrome-autofill-extension/releases/latest";
+const LATEST_RELEASE_DOWNLOAD_URL = "https://github.com/sroncall/chrome-autofill-extension/releases/latest/download/autofill-otp-chrome-latest.zip";
+
+type LatestReleasePayload = {
+    tag_name?: string;
+};
+
+function parseSemver(value: string): [number, number, number] | null {
+    const cleaned = value.trim().replace(/^v/i, "");
+    const match = cleaned.match(/^(\d+)\.(\d+)\.(\d+)/);
+    if (!match) {
+        return null;
+    }
+
+    const major = Number.parseInt(match[1], 10);
+    const minor = Number.parseInt(match[2], 10);
+    const patch = Number.parseInt(match[3], 10);
+
+    if (Number.isNaN(major) || Number.isNaN(minor) || Number.isNaN(patch)) {
+        return null;
+    }
+
+    return [major, minor, patch];
+}
+
+function compareSemver(a: string, b: string): number {
+    const parsedA = parseSemver(a);
+    const parsedB = parseSemver(b);
+
+    if (!parsedA || !parsedB) {
+        return 0;
+    }
+
+    for (let index = 0; index < 3; index += 1) {
+        if (parsedA[index] > parsedB[index]) {
+            return 1;
+        }
+
+        if (parsedA[index] < parsedB[index]) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+async function fetchLatestReleaseTag(): Promise<string | null> {
+    try {
+        const response = await fetch(LATEST_RELEASE_API_URL, {
+            method: "GET",
+            headers: {
+                Accept: "application/vnd.github+json"
+            }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const payload = await response.json() as LatestReleasePayload;
+        if (!payload.tag_name || payload.tag_name.trim().length === 0) {
+            return null;
+        }
+
+        return payload.tag_name.trim();
+    } catch {
+        return null;
+    }
+}
+
 function clampButtonToViewport(button: HTMLButtonElement, left: number, top: number): { left: number; top: number } {
     const margin = 8;
     const maxLeft = Math.max(margin, window.innerWidth - button.offsetWidth - margin);
@@ -108,7 +178,9 @@ export function createAutofillButton({ onAutofillClick }: CreateAutofillButtonOp
 
     let statusTimer: number | null = null;
     let autofillInProgress = false;
+    let latestVersionLabel: string | null = null;
     const helpTooltip = document.createElement("div");
+    const updateLink = document.createElement("a");
 
     const updateHelpTooltipText = (): void => {
         const configuredLastName = getConfiguredLastName();
@@ -120,6 +192,10 @@ export function createAutofillButton({ onAutofillClick }: CreateAutofillButtonOp
 
         if (configuredLastName) {
             lines.push(`lastName activo: ${configuredLastName}`);
+        }
+
+        if (latestVersionLabel) {
+            lines.push(`Nueva version: ${latestVersionLabel}`);
         }
 
         helpTooltip.textContent = lines.join("\n");
@@ -164,6 +240,25 @@ export function createAutofillButton({ onAutofillClick }: CreateAutofillButtonOp
         boxShadow: "0 8px 18px rgba(0, 0, 0, 0.28)"
     });
 
+    updateLink.href = LATEST_RELEASE_DOWNLOAD_URL;
+    updateLink.target = "_blank";
+    updateLink.rel = "noopener noreferrer";
+    updateLink.textContent = "Update disponible";
+
+    Object.assign(updateLink.style, {
+        position: "fixed",
+        zIndex: "2147483647",
+        display: "none",
+        padding: "6px 10px",
+        borderRadius: "9999px",
+        textDecoration: "none",
+        background: "#f59e0b",
+        color: "#111827",
+        fontSize: "12px",
+        fontWeight: "700",
+        boxShadow: "0 6px 14px rgba(0, 0, 0, 0.22)"
+    });
+
     const savedPosition = loadButtonPosition();
     if (savedPosition) {
         applyButtonPosition(button, savedPosition.left, savedPosition.top);
@@ -178,6 +273,14 @@ export function createAutofillButton({ onAutofillClick }: CreateAutofillButtonOp
         const left = Math.max(8, Math.min(window.innerWidth - 348, rect.left));
         helpTooltip.style.top = `${top}px`;
         helpTooltip.style.left = `${left}px`;
+    };
+
+    const positionUpdateLink = (): void => {
+        const rect = button.getBoundingClientRect();
+        const left = Math.max(8, Math.min(window.innerWidth - 180, rect.left));
+        const top = Math.max(8, rect.top - 36);
+        updateLink.style.left = `${left}px`;
+        updateLink.style.top = `${top}px`;
     };
 
     const showHelpTooltip = (): void => {
@@ -218,13 +321,27 @@ export function createAutofillButton({ onAutofillClick }: CreateAutofillButtonOp
         if (helpTooltip.style.display === "block") {
             positionHelpTooltip();
         }
+
+        if (updateLink.style.display === "block") {
+            positionUpdateLink();
+        }
     });
 
     window.addEventListener("scroll", () => {
         if (helpTooltip.style.display === "block") {
             positionHelpTooltip();
         }
+
+        if (updateLink.style.display === "block") {
+            positionUpdateLink();
+        }
     }, true);
+
+    button.addEventListener("pointermove", () => {
+        if (updateLink.style.display === "block") {
+            positionUpdateLink();
+        }
+    });
 
     button.addEventListener("click", (event) => {
         if (button.dataset.devbuddySkipClick === "1") {
@@ -334,6 +451,33 @@ export function createAutofillButton({ onAutofillClick }: CreateAutofillButtonOp
     });
 
     document.body.appendChild(helpTooltip);
+    document.body.appendChild(updateLink);
+
+    const installedVersion = (globalThis as typeof globalThis & {
+        chrome?: {
+            runtime?: {
+                getManifest?: () => { version?: string };
+            };
+        };
+    }).chrome?.runtime?.getManifest?.().version;
+
+    if (installedVersion) {
+        void fetchLatestReleaseTag().then((latestTag) => {
+            if (!latestTag) {
+                return;
+            }
+
+            if (compareSemver(latestTag, installedVersion) <= 0) {
+                return;
+            }
+
+            latestVersionLabel = latestTag;
+            updateHelpTooltipText();
+            updateLink.textContent = `Update ${latestTag}`;
+            updateLink.style.display = "block";
+            positionUpdateLink();
+        });
+    }
 
     return button;
 }
