@@ -14,6 +14,9 @@ permissions:
 jobs:
   build-and-publish:
     runs-on: windows-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -62,4 +65,5 @@ jobs:
           path: public
 
       - name: Deploy GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
