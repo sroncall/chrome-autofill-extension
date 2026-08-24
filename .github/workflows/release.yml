@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to publish (example: v1.0.2)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -46,6 +51,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             artifacts/${{ steps.meta.outputs.file }}
             artifacts/autofill-otp-chrome-latest.zip
