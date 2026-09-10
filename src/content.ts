@@ -14,6 +14,10 @@ function shouldEnableForCurrentHost(hostname: string): boolean {
     if (host === "emerios.com" || host.endsWith(".emerios.com")) {
         return true;
     }
+    
+    if (host === "vmbc.com" || host.endsWith(".vmbc.com")) {
+        return true;
+    }
 
     if (host === "localhost" || host === "127.0.0.1") {
         return true;

@@ -1,5 +1,5 @@
 const MAILINATOR_API_BASE_URL = "https://www.mailinator.com/api/v2/domains/public";
-const OTP_REGEX = /\b\d{6}\b/;
+const OTP_REGEX = /\b\d{4,8}\b/;
 const OTP_POLL_ATTEMPTS = 4;
 const OTP_POLL_DELAY_MS = 7000;
 const INBOX_COOLDOWN_MS = 20000;
@@ -53,8 +53,15 @@ function decodeQuotedPrintable(input: string): string {
 function extractOtpFromVerificationText(text: string): string | null {
     const normalized = text.replace(/\s+/g, " ").trim();
 
+    const contextualPattern =
+        /(?:verification|confirmation)\s+(?:code|number)|enter\s+(?:this|the)\s+(?:verification|confirmation)\s+(?:code|number)[\s\S]{0,180}?(\b\d{4,8}\b)/i;
+    const contextualMatch = normalized.match(contextualPattern)?.[1];
+    if (contextualMatch) {
+        return contextualMatch;
+    }
+
     const sectionPattern =
-        /email\s*verification[\s\S]{0,420}?(?:verification\s*code|enter\s*the\s*following)?[\s\S]{0,220}?(\b\d{6}\b)[\s\S]{0,260}?(?:expire|minutes|thank\s*you)/i;
+        /email\s*verification[\s\S]{0,420}?(?:verification\s*code|enter\s*the\s*following)?[\s\S]{0,220}?(\b\d{4,8}\b)[\s\S]{0,260}?(?:expire|minutes|thank\s*you)/i;
     const sectionMatch = normalized.match(sectionPattern)?.[1];
     if (sectionMatch) {
         return sectionMatch;

@@ -78,6 +78,7 @@ Incluye, entre otros:
 
 - `genmobile.com` y subdominios
 - `emerios.com` y subdominios
+- `.vmbc.com` y subdominios
 - `localhost` y `127.0.0.1`
 - Hosts con prefijo `fluxor-public.` y `fluxor-fe.`
 
