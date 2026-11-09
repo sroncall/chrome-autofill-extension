@@ -45,7 +45,16 @@ export function setInputValue(input: FillableElement | null, value: string): voi
     }
 
     input.focus();
-    input.value = value;
+    // Use the native setter so controlled inputs (e.g. React) observe the update.
+    const prototype = input instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+    if (setter) {
+        setter.call(input, value);
+    } else {
+        input.value = value;
+    }
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
 }

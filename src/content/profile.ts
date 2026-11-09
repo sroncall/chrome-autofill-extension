@@ -113,9 +113,13 @@ const defaultProfile: PageProfile = {
     ],
     otp: [
         "#otp",
+        "#pin",
         "#code",
         "#verificationCode",
         "input[name='otp']",
+        "input[name='pin']",
+        "input[name='validationPin']",
+        "input[name='otpCode']",
         "input[name='code']",
         "input[name='verificationCode']",
         "input[autocomplete='one-time-code']"

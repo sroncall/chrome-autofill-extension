@@ -1,5 +1,6 @@
 import { faker } from "@faker-js/faker";
 import { fillStreetAddressFromZipCode } from "./address";
+import { loadAutofillFlow, persistAutofillFlow, shouldReuseFlow } from "./flow";
 import {
     AUTOFILL_BUTTON_DEFAULT_LABEL,
     MAILINATOR_DOMAIN,
@@ -35,10 +36,14 @@ export async function handleAutofillClick(button: HTMLButtonElement): Promise<vo
     const lastNameInput = queryFirstInput(profile.lastName);
     const initialsInputs = queryAllInputs(profile.initials);
     const emailInput = queryFirstInput(profile.email);
-    const storedProfile = loadStoredAutofillProfile();
-    const shouldReuseStoredNames = Boolean(
-        storedProfile && (!emailInput || (initialsInputs.length > 0 && !firstNameInput && !lastNameInput))
-    );
+    const otpInput = queryFirstInput(profile.otp);
+    const flow = loadAutofillFlow();
+    // Include the field set to distinguish steps in single-page applications.
+    const step = `${window.location.pathname}${window.location.search}::${[
+        firstNameInput, lastNameInput, emailInput, initialsInputs[0], queryFirstInput(profile.signature)
+    ].map((input) => input ? `${input.tagName}:${input.id}:${input.name}` : "-").join("|")}`;
+    const shouldReuseStoredNames = shouldReuseFlow(flow, step, Boolean(otpInput));
+    const storedProfile = shouldReuseStoredNames ? flow?.profile : null;
 
     const firstName = shouldReuseStoredNames && storedProfile
         ? storedProfile.firstName
@@ -47,13 +52,15 @@ export async function handleAutofillClick(button: HTMLButtonElement): Promise<vo
         ? storedProfile.lastName
         : (getConfiguredLastName() ?? generatePatternSafeLastName());
 
-    const forceGenerateNewInbox = Boolean(emailInput);
-    const inboxState = resolveMailinatorInbox(emailInput, firstName, lastName, forceGenerateNewInbox);
+    // A verification screen must never replace the inbox that received its PIN.
+    const forceGenerateNewInbox = !shouldReuseStoredNames && !otpInput;
+    const inboxState = resolveMailinatorInbox(emailInput, firstName, lastName, forceGenerateNewInbox,
+        storedProfile?.email ?? (otpInput ? loadStoredAutofillProfile()?.email : undefined));
     const inbox = inboxState.inbox;
     const email = Patterns.Email.test(inboxState.email)
         ? inboxState.email
         : `${sanitizeInboxToken(firstName)}.${sanitizeInboxToken(lastName)}@${MAILINATOR_DOMAIN}`;
-    const phone = generateUsPhoneNumber();
+    const phone = storedProfile?.phone ?? generateUsPhoneNumber();
     const ssn = faker.string.numeric(4);
     const birthDate = faker.date.birthdate({ min: 18, max: 65, mode: "age" });
     const dobInput = queryFirstInput(profile.dob);
@@ -62,7 +69,6 @@ export async function handleAutofillClick(button: HTMLButtonElement): Promise<vo
         dob = "01/15/1995";
     }
 
-    const otpInput = queryFirstInput(profile.otp);
     const initials = buildInitials(firstName, lastName);
 
     setInputValue(firstNameInput, firstName);
@@ -88,14 +94,16 @@ export async function handleAutofillClick(button: HTMLButtonElement): Promise<vo
     fillRequiredChoiceInputs();
     setInputValue(queryFirstInput(profile.signature), `${firstName} ${lastName}`);
 
-    persistAutofillProfile({
+    const filledProfile = {
         firstName,
         lastName,
         email,
         phone,
-        zipCode: queryFirstInput(profile.zipCode)?.value?.trim() ?? "",
-        streetAddress: queryFirstInput(profile.streetAddress)?.value?.trim() ?? ""
-    });
+        zipCode: queryFirstInput(profile.zipCode)?.value?.trim() || storedProfile?.zipCode || "",
+        streetAddress: queryFirstInput(profile.streetAddress)?.value?.trim() || storedProfile?.streetAddress || ""
+    };
+    persistAutofillProfile(filledProfile);
+    persistAutofillFlow(shouldReuseStoredNames && flow ? flow.startStep : step, filledProfile);
 
     if (!otpInput) {
         button.textContent = "Datos completados";
@@ -115,9 +123,9 @@ export async function handleAutofillClick(button: HTMLButtonElement): Promise<vo
 
     try {
         const otp = await fetchLatestOtpFromMailinator(inbox);
-        button.textContent = otp ? `OTP aplicado: ${otp}` : "OTP aun no llega (espera 20s)";
+        button.textContent = otp ? "PIN aplicado" : "PIN no recibido; vuelve a intentar";
         if (otp) {
-            setInputValue(otpInput, otp);
+            setInputValue(queryFirstInput(profile.otp), otp);
         }
     } catch (error) {
         console.error("Error al buscar OTP en Mailinator", error);

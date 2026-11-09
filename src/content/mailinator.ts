@@ -34,7 +34,7 @@ export async function fetchLatestOtpFromMailinator(inbox: string): Promise<strin
         return null;
     }
 
-    const sendMessage = runtime.sendMessage;
+    const sendMessage = runtime.sendMessage.bind(runtime);
 
     const response = await new Promise<OtpResponseMessage>((resolve, reject) => {
         sendMessage(
@@ -101,7 +101,8 @@ export function resolveMailinatorInbox(
     emailInput: FillableElement | null,
     firstName: string,
     lastName: string,
-    forceGenerateNew: boolean
+    forceGenerateNew: boolean,
+    flowEmail?: string
 ): StoredInboxState {
     if (forceGenerateNew) {
         return buildPatternSafeMailinatorEmail(firstName, lastName);
@@ -111,6 +112,11 @@ export function resolveMailinatorInbox(
     const existingInbox = parseMailinatorInboxFromEmail(existingEmail);
     if (existingInbox) {
         return persistInbox(existingInbox);
+    }
+
+    const flowInbox = flowEmail ? parseMailinatorInboxFromEmail(flowEmail) : null;
+    if (flowInbox) {
+        return persistInbox(flowInbox);
     }
 
     const stored = loadStoredInbox();
